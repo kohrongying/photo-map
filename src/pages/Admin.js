@@ -1,57 +1,102 @@
 import React from 'react';
-import { Map, GoogleApiWrapper, Marker } from 'google-maps-react';
 import firebase from "../firebase";
+import { Layout, Menu, Form, Input, Button, Row, Col, message } from 'antd';
+import Map from "../components/Map";
 
-const mapStyles = {
-  width: '100%',
-  height: '100%'
+const { Header } = Layout;
+
+const layout = {
+  labelCol: { span: 8 },
+  wrapperCol: { span: 16 },
+};
+const tailLayout = {
+  wrapperCol: { offset: 8, span: 16 },
 };
 
-class Admin extends React.Component {
+export default class Admin extends React.Component {
 
   state = {
-    coordinates: [],
+    user: null,
   }
 
   componentDidMount() {
-    firebase.database().ref('latlong').on('value', snapshot => {
-      const coordinates = snapshot.val();
-      this.setState({ coordinates })
-    })
+    firebase.auth().onAuthStateChanged((user) => {
+      if (user) {
+        // User is signed in
+        this.setState({ user: user.uid })
+      } else {
+        this.setState({ user: null })
+      }
+    });
   }
 
-  componentWillUnmount() {
-    firebase.database().ref('latlong').off();
+  onLogout = () => {
+    firebase.auth().signOut()
+      .catch(function(error) {
+        console.log(error);
+      });
   }
+
+  onFinish = values => {
+    firebase.auth().signInWithEmailAndPassword(values.username, values.password).catch(function(error) {
+      var errorMessage = error.message;
+      message.error('Incorrect email or password');
+      console.log(errorMessage)
+    });
+  };
 
   render() {
     return (
       <React.Fragment>
-        <h1>Admin</h1>
+        {this.state.user ? (
+          <Layout>
+            <Header>
+              <Menu theme="dark" mode="horizontal">
+                <Menu.Item key="1">Admin</Menu.Item>
+                <Menu.Item key="2" onClick={this.onLogout}>Logout</Menu.Item>
+              </Menu>
+            </Header>
+            
+            <Map />
+          </Layout>
+        ) : (
+          <React.Fragment>
+            <Row style={{ marginTop: 50 }} justify="center">
+              <Col span={12}>
+                <Form
+                  {...layout}
+                  name="basic"
+                  onFinish={this.onFinish}
+                >
+                  <Form.Item
+                    label="Username"
+                    name="username"
+                    rules={[{ required: true, message: 'Please input your username!' }]}
+                  >
+                    <Input />
+                  </Form.Item>
 
-        <Map
-          google={this.props.google}
-          zoom={12}
-          style={mapStyles}
-          initialCenter={{
-          lat: 1.3521,
-          lng: 103.8198
-          }}
-        >
-          {Object.values(this.state.coordinates).map(coor => {
-            if (coor.lat && coor.long) {
-              return <Marker position={{ lat: coor.lat, lng: coor.long }} />  
-            }
-            return null;
-          })}
-          
-        </Map>
+                  <Form.Item
+                    label="Password"
+                    name="password"
+                    rules={[{ required: true, message: 'Please input your password!' }]}
+                  >
+                    <Input.Password />
+                  </Form.Item>
 
+                  {this.state.formEf}
+                  <Form.Item {...tailLayout}>
+                    <Button type="primary" htmlType="submit">
+                      Submit
+                    </Button>
+                  </Form.Item>
+                </Form>
+              </Col>
+            </Row>
+          </React.Fragment>
+        )}
+        
       </React.Fragment>
     );
   }
 }
-
-export default GoogleApiWrapper({
-  apiKey: process.env.REACT_APP_GOOGLE_MAPS_API_KEY
-})(Admin);
